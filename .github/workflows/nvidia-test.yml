@@ -15,7 +15,8 @@ on:
 
 jobs:
     test:
-        runs-on: [self-hosted, testflinger]
+        # runs-on: [self-hosted, testflinger]
+        runs-on: ubuntu-latest
         env:
           GEN_JOB_PATH: ${{ github.workspace }}/generated-job.yaml
         strategy:
@@ -48,6 +49,8 @@ jobs:
                   < .github/workflows/scripts/setup.sh \
                   > .github/workflows/scripts/temp.sh
                 mv .github/workflows/scripts/temp.sh .github/workflows/scripts/setup.sh
+
+                cat .github/workflows/scripts/setup.sh
 
             - name: Submit Testflinger job
               uses: canonical/testflinger/.github/actions/submit@main
