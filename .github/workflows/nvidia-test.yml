@@ -1,0 +1,59 @@
+name: Nvidia Graphics Tests
+
+on:
+  # TODO: remove this trigger which is for testing
+  pull_request:
+    branches: [ main ] 
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      snap-channel:
+        description: 'Snap store channel'
+        required: true
+        type: string
+        default: 'latest/edge'
+
+jobs:
+    test:
+        # runs-on: [self-hosted, testflinger]
+        runs-on: ubuntu-latest
+        env:
+          GEN_JOB_PATH: ${{ github.workspace }}/generated-job.yaml
+        strategy:
+          fail-fast: true
+          matrix:
+            job-queue:
+              - 202007-28059
+              # - 202008-2816s7
+              # - 202112-29789
+              # noprovision node, for CI testing
+              # - 202302-31212
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Create Testflinger job queue
+              run: |
+                export JOB_QUEUE="${{ matrix.job-queue }}"
+                export SNAP_CHANNEL="${{ inputs.snap-channel }}"
+                
+                envsubst '$JOB_QUEUE' \
+                  < .github/workflows/testflinger/nvidia.yaml \
+                  > $GEN_JOB_PATH
+
+                # # Replace channel with value from the manual trigger input
+                # sed -i "s/^[[:space:]]*DOCKER_SNAP_CHANNEL=.*/DOCKER_SNAP_CHANNEL=$SNAP_CHANNEL/" \
+                #   .github/workflows/scripts/testflinger/setup.sh
+
+                envsubst '$SNAP_CHANNEL' \
+                  < .github/workflows/scripts/setup.sh \
+                  > .github/workflows/scripts/temp.sh
+                mv .github/workflows/scripts/temp.sh .github/workflows/scripts/setup.sh
+
+                cat .github/workflows/scripts/setup.sh
+
+            - name: Submit Testflinger job
+              uses: canonical/testflinger/.github/actions/submit@main
+              with:
+                poll: true
+                job-path: ${{ env.GEN_JOB_PATH }}
