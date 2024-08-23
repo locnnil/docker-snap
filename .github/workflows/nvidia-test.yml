@@ -5,6 +5,10 @@ on:
   # pull_request:
   #   branches: [ main ]
   # Manual trigger
+  workflow_run:
+    workflows: ["Build and Publish"]
+    types:
+      - completed
   workflow_dispatch:
     inputs:
       snap-channel:
@@ -31,11 +35,27 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v4
 
+            - name: Get Workflow config decision
+              uses: dawidd6/action-download-artifact@v6
+              with:
+                workflow: build-and-publish.yml
+                name: config.json
+
+            - name: Extract configs
+              run: |
+                echo "PR_NUMBER=$(jq -r '.pr-number' config.json)" >> "$GITHUB_ENV"
+                echo "UPLOADED_TO_STORE=$(jq -r '.uploaded-to-store' config.json)" >> "$GITHUB_ENV"
+
             - name: Create Testflinger job queue
               run: |
                 export JOB_QUEUE="${{ matrix.job-queue }}"
-                export SNAP_CHANNEL="${{ inputs.snap-channel }}"
-                
+
+                if [ "$UPLOADED_TO_STORE" == "true" ]; then
+                  export SNAP_CHANNEL="${{ inputs.snap-channel }}"
+                else
+                  export SNAP_CHANNEL="edge/pr-$PR_NUMBER"
+                fi
+
                 envsubst '$JOB_QUEUE' \
                   < $TESTFLINGER_DIR/nvidia-job.yaml \
                   > $TESTFLINGER_DIR/nvidia-job.temp
