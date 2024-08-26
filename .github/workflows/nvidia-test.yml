@@ -33,6 +33,7 @@ jobs:
             - name: Debug system resources
               run: |
 
+                set -x
                 whoami
                 echo -e "\nInstalling dbg pkg"
                 sudo apt install -y sysstat
