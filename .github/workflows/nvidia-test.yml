@@ -51,7 +51,7 @@ jobs:
                 cat /proc/meminfo
                 echo -e "\nChecking disk"
                 df -h
-                cd / && du -sh *
+                cd / && sudo du -d 0 -h *
                 exit -1
 
             - name: Get the artifact
