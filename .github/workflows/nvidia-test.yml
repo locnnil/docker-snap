@@ -33,6 +33,15 @@ jobs:
             - name: Debug system resources
               run: |
 
+                echo  -e "\nCheck CPU settings"
+                nproc
+                cat /proc/cpuinfo
+                idle_cpu=$(mpstat 1 1 | awk '/all/ {idle=$NF} END {print idle}')
+
+                cpu_usage=$(echo "100 - $idle_cpu" | bc)
+                echo -e "CPU usage:"
+                echo -e "CPU(%): $cpu_usage\tIDLE(%): $idle_cpu"
+
                 echo -e "\nChecking memory"
                 free -h
                 cat /proc/meminfo
