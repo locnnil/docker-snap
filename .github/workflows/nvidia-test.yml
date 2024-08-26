@@ -33,6 +33,10 @@ jobs:
             - name: Debug system resources
               run: |
 
+                whoami
+                echo -e "\nInstalling dbg pkg"
+                sudo apt install -y sysstat
+
                 echo  -e "\nCheck CPU settings"
                 nproc
                 cat /proc/cpuinfo
