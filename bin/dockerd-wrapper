@@ -1,6 +1,45 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+yolo() {
+	"$@" > /dev/null 2>&1 || :
+}
+
+force_umount() {
+	yolo umount    "$@"
+	yolo umount -f "$@"
+	yolo umount -l "$@"
+}
+
+workaround_modprobe_filesesytems() {
+	# Inside our snap, we are not able to "modprobe" - probably no access to the .ko files
+	# This workaround forces the kernel itself to "modprobe" for these filesystems, 
+	# so that the modules we need are available to Docker
+	dir="$(mktemp -d)"
+	# Always clean up, even if an error occurred
+	trap "force_umount --no-mtab '$dir'; rm -rf '$dir'" EXIT
+	
+	# try mounting a few FS types to force the kernel to try loading modules
+	# aufs
+	yolo mount --no-mtab -t aufs /dev/null "$dir" 
+	force_umount --no-mtab "$dir"
+
+	# zfs
+	yolo mount --no-mtab -t zfs /dev/null "$dir" 
+	force_umount --no-mtab "$dir"
+
+	# overlayfs - needs additional directories: https://docs.kernel.org/filesystems/overlayfs.html#directories
+	upper="$(mktemp -d)"
+	lower="$(mktemp -d)"
+	work="$(mktemp -d)"
+	yolo mount --no-mtab -t overlay /dev/null -olowerdir="$lower",upperdir="$upper",workdir="$work" "$dir" 
+	force_umount --no-mtab "$dir"
+
+	# clean up temp dirs
+	rm -rf "$dir" "$upper" "$lower" "$work"
+	trap - EXIT
+}
+
 workaround_apparmor_profile_reload() {
 	local aa_profile_reloaded="$SNAP_COMMON/profile_reloaded"
 	# https://github.com/docker/docker-snap/issues/4
@@ -22,35 +61,6 @@ workaround_lp1606510() {
 	fi
 }
 
-yolo() {
-	"$@" > /dev/null 2>&1 || :
-}
-
-force_umount() {
-	yolo umount    "$@"
-	yolo umount -f "$@"
-	yolo umount -l "$@"
-}
-
-dir="$(mktemp -d)"
-# overlayfs: https://docs.kernel.org/filesystems/overlayfs.html#directories
-upper="$(mktemp -d)"
-lower="$(mktemp -d)"
-work="$(mktemp -d)"
-
-# inside our snap, we can't "modprobe" for whatever reason (probably no access to the .ko files)
-# so this forces the kernel itself to "modprobe" for these filesystems so that the modules we need are available to Docker
-trap "force_umount --no-mtab '$dir'; rm -rf '$dir'" EXIT
-# try mounting a few FS types to force the kernel to try loading modules
-yolo mount --no-mtab -t overlay /dev/null -olowerdir="$lower",upperdir="$upper",workdir="$work" "$dir" 
-force_umount --no-mtab "$dir"
-yolo mount --no-mtab -t aufs /dev/null "$dir" 
-force_umount --no-mtab "$dir"
-yolo mount --no-mtab -t zfs /dev/null "$dir" 
-force_umount --no-mtab "$dir"
-
-rm -rf "$dir" "$upper" "$lower" "$work"
-trap - EXIT
 
 # modify XDG_RUNTIME_DIR to be a snap writable dir underneath $SNAP_COMMON 
 # (until https://bugs.launchpad.net/snappy/+bug/1656340 is fixed)
@@ -67,8 +77,9 @@ mkdir -p "$SNAP_COMMON/var-lib-docker"
 run_dir="/run/snap.$SNAP_INSTANCE_NAME"
 mkdir -p "$run_dir"
 
+# Apply workarounds
+workaround_modprobe_filesesytems
 workaround_lp1606510
-
 workaround_apparmor_profile_reload
 
 exec dockerd \
