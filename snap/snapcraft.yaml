@@ -1,8 +1,9 @@
 name: docker
-version: '28.0.1'
 summary: Docker container runtime
 description: Refer to https://snapcraft.io/docker
 license: (Apache-2.0 AND MIT AND GPL-2.0)
+# version: unstable
+adopt-info: version
 
 grade: stable
 confinement: strict
@@ -112,6 +113,36 @@ apps:
     command: bin/help
 
 parts:
+
+  version:
+    plugin: nil
+    override-pull: |
+      set -x
+      craftctl set version=unstable+$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  
+  register-githashes:
+    plugin: dump
+    source: buildhashes
+    source-type: file
+    build-packages:
+      - jq
+    override-build: |
+      repos=(
+        "moby/moby"
+        "containerd/containerd"
+        "opencontainers/runc"
+        "krallin/tini"
+        "docker/cli"
+        "docker/buildx"
+        "docker/compose"
+      )
+      
+      for repo in "${repos[@]}"; do
+        latest_commit=$(curl -s "https://api.github.com/repos/$repo/commits" | jq -r '.[0].sha')
+        echo "$repo commit: $latest_commit" > buildhashes
+      done
+      cp buildhashes $CRAFT_PART_INSTALL
+
   wrapper-scripts:
     plugin: dump
     source: .
@@ -141,7 +172,7 @@ parts:
   engine:
     plugin: make
     source: https://github.com/moby/moby.git
-    source-tag: v28.0.1
+    source-branch: master
     source-depth: 1
     override-build: |
       $CRAFT_STAGE/patches/patch.sh
@@ -188,8 +219,7 @@ parts:
   containerd:
     plugin: make
     source: https://github.com/containerd/containerd.git
-    # from https://github.com/moby/moby/blob/v28.0.1/Dockerfile#L199
-    source-tag: v1.7.25
+    source-branch: main
     source-depth: 1
     override-build: |
       make GIT_COMMIT= GIT_BRANCH= LDFLAGS=
@@ -205,8 +235,7 @@ parts:
   runc:
     plugin: make
     source: https://github.com/opencontainers/runc.git
-    # from https://github.com/moby/moby/blob/v28.0.1/Dockerfile#L290
-    source-tag: v1.2.5
+    source-branch: main
     source-depth: 1
     override-build: |
       make BUILDTAGS='seccomp apparmor selinux' COMMIT=
@@ -268,8 +297,7 @@ parts:
     plugin: cmake
     source: https://github.com/krallin/tini.git
     source-type: git
-    # from https://github.com/moby/moby/blob/v28.0.1/Dockerfile#L325
-    source-tag: v0.19.0
+    source-branch: master
     source-depth: 1
     organize:
       'usr/local/bin/tini-static': bin/docker-init
@@ -282,7 +310,7 @@ parts:
     plugin: make
     build-snaps: *go
     source: https://github.com/docker/cli.git
-    source-tag: v28.0.0-rc.1
+    source-branch: master
     source-depth: 1
     override-build: |
       # docker build specific environment variables
@@ -309,8 +337,7 @@ parts:
   buildx:
     plugin: nil
     source: https://github.com/docker/buildx.git
-    # https://github.com/moby/moby/blob/v28.0.1/Dockerfile#L15
-    source-tag: v0.20.1
+    source-branch: master
     source-depth: 1
     override-build: |
       export DESTDIR="$CRAFT_PART_INSTALL/usr/libexec/docker/cli-plugins"
@@ -323,9 +350,7 @@ parts:
   compose-v2:
     plugin: make
     source: https://github.com/docker/compose.git
-    # https://github.com/docker/docker-ce-packaging/blob/master/common.mk // reference URL
-    # https://github.com/moby/moby/blob/v28.0.1/Dockerfile#L16 // Fetch from
-    source-tag: v2.33.1 # Ahead of Moby because of https://github.com/canonical/docker-snap/issues/251
+    source-branch: main
     source-depth: 1
     override-build: |
       make build
