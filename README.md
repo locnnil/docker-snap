@@ -2,10 +2,10 @@
 
 # Docker Snap
 
-This repository contains the source for the `docker` snap package.  The package provides a distribution of Docker Engine along with the Nvidia toolkit for Ubuntu Core and other snap-compatible systems.  The Docker Engine is built from an upstream release tag with some patches to fit the snap format and is available on `armhf`, `arm64`, `amd64`, `i386`, and `ppc64el` architectures.  The rest of this page describes installation, usage, and development.
+This repository contains the source for the `docker` snap package.  The package provides a distribution of Docker Engine along with the Nvidia toolkit for Ubuntu Core and other snap-compatible systems.  The Docker Engine is built from an upstream release tag with some patches to fit the snap format and is available on `armhf`, `arm64`, `amd64`, `i386`, `ppc64el`, `riscv64` and `s390x` architectures.  The rest of this page describes installation, usage, and development.
 
 > [!NOTE]
-> [Docker's official documentation](https://docs.docker.com) does not discuss the `docker` snap package.
+> [Docker's official documentation](https://docs.docker.com) does not discuss the `docker` snap package. For questions regarding the snap usage, refer to the [discussions](https://github.com/canonical/docker-snap/discussions).
 
 ## Installation
 
@@ -31,6 +31,37 @@ If you are using Ubuntu Core 16, connect the `docker:home` plug as it's not auto
 
 ```shell
 sudo snap connect docker:home
+```
+
+The `docker-compose` [alias](https://snapcraft.io/docs/commands-and-aliases) was set automatically for Compose V1 and remains for backwards-compatiblity.
+The recommended command-line syntax since Compose V2 is `docker compose` as described [here](https://docs.docker.com/compose/releases/migrate/).
+
+### Changing the data root directory
+
+In the `docker` snap, the default location for the [data-root](https://docs.docker.com/engine/daemon/#daemon-data-directory) directory is `$SNAP_COMMON/var-lib-docker`, which maps to `/var/snap/docker/common/var-lib-docker` based on the [snap data locations](https://snapcraft.io/docs/data-locations#heading--system).
+
+> [!WARNING]
+> By default, SnapD removes the snap's data locations and creates [snapshots](https://snapcraft.io/docs/snapshots) that serve as backup. 
+> Changing the root directory to a different path results in loss of snapshot functionalities, leaving you responsible for the management of those files.  
+  
+To modify the default location, use [snap configuration options](https://snapcraft.io/docs/configuration-in-snaps):  
+  
+**Get the current value:**  
+```shell
+sudo snap get docker data-root
+```  
+  
+**Set a new location:**  
+```shell
+sudo snap set docker data-root=<new-directory>
+```
+Make sure to use a location that the snap has access to, which is:
+- Inside the `$HOME` directory;
+- Within a snap-writable area, as described in the [data locations documentation](https://snapcraft.io/docs/data-locations).
+
+Then restart the dockerd service:
+```shell
+sudo snap restart docker.dockerd
 ```
 
 ### Running Docker as normal user
@@ -64,6 +95,12 @@ Docker should function normally, with the following caveats:
 * All files that `docker` needs access to should live within your `$HOME` folder.
 
   * If you are using Ubuntu Core 16, you'll need to work within a subfolder of `$HOME` that is readable by root; see [#8](https://github.com/docker/docker-snap/issues/8).
+
+* If you need `docker` to interact with removable media (external storage drives) for use in containers, volumes, images, or any other Docker-related operations, you must connect the [removable-media interface](https://snapcraft.io/docs/removable-media-interface) to the snap:  
+
+  ```shell
+  sudo snap connect docker:removable-media
+  ```
 
 * Additional certificates used by the Docker daemon to authenticate with registries need to be located in `/var/snap/docker/common/etc/certs.d` instead of `/etc/docker/certs.d`.
 
