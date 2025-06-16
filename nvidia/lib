@@ -70,12 +70,10 @@ cdi_generate () {
     fi
     echo "CONTENT_PATH=${CONTENT_PATH}"
 
-    if snapctl is-connected gpu-2404; then
-        # This if statement tests the hypotesis:
-        # FIXME: if UC24, can we just rely on the wrapper env instead of these vars ?
-        XDG_DATA_DIRS="${XDG_DATA_DIRS:-}" LD_LIBRARY_PATH="${LD_LIBRARY_PATH}" "${SNAP}/usr/bin/nvidia-ctk" cdi generate --nvidia-ctk-path "${SNAP}/usr/bin/nvidia-ctk" --device-name-strategy "${CDI_DEVICE_NAME_STRATEGY}" --output "${SNAP_DATA}/etc/cdi/nvidia.yaml"
-        return
-    fi
+    # FIXME: if UC24, can we just rely on the wrapper env instead of these vars ?
+    CDI_LIB_SEARCH_PATH="${CONTENT_PATH}/lib/${ARCH_TRIPLET}"
+    CDI_CONFIG_SEARCH_PATH="${CONTENT_PATH}/share"
+    CDI_PATH="${PATH}:${CONTENT_PATH}/bin"
 
     # Otherwise, if on classic and nvidia driver is installed, set hostfs for the CDI libs search path and shell path #
     if [ "${NVIDIA_SUPPORT_CLASSIC}" == "true" ]; then
